@@ -15,7 +15,7 @@
         #msg { position: absolute; inset: 0; background: rgba(3,8,16,0.96); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; backdrop-filter: blur(8px); }
         #msg h2 { font-size: 28px; color: #fff; margin-bottom: 10px; text-shadow: 0 0 15px #0088ff; }
         #msg p { color: #7aafd4; margin-bottom: 30px; font-size: 14px; }
-        #msg button { background: #0088ff; color: #fff; border: none; border-radius: 30px; padding: 14px 50px; font-size: 16px; font-weight: bold; box-shadow: 0 5px 15px rgba(0,136,255,0.4); }
+        #msg button { background: #0088ff; color: #fff; border: none; border-radius: 30px; padding: 14px 50px; font-size: 16px; font-weight: bold; }
         #hint { position: absolute; bottom: 50px; width: 100%; text-align: center; color: rgba(77,184,255,0.4); font-size: 12px; letter-spacing: 1px; }
     </style>
 </head>
@@ -39,7 +39,7 @@ const cv = document.getElementById('cv'), cx = cv.getContext('2d');
 const scEl = document.getElementById('sc'), bsEl = document.getElementById('bs'), msg = document.getElementById('msg');
 
 let W, H, gameState, score = 0, best = 0, holding = false, holdStart = 0, time = 0;
-let tanks = [], shark, particles = [], cam = { x: 0, tx: 0 };
+let tanks = [], shark, particles = [], camX = 0, targetCamX = 0;
 
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
@@ -72,26 +72,24 @@ function resize() {
 window.addEventListener('resize', resize); resize();
 
 function makeTank(x) {
-    const tankW = W * 0.22; const tankH = H * 0.12;
+    const tankW = W * 0.24; const tankH = H * 0.12;
     return { x, y: H - tankH - 120, w: tankW, h: tankH, color: '#00ccff' };
 }
 
 function initGame() {
     score = 0; scEl.textContent = 0;
-    const firstW = W * 0.22;
-    // 强制第一只鱼缸在屏幕偏左一点，给起跳留出空间
+    // 起点缸位置
     tanks = [makeTank(W * 0.15)]; 
-    for(let i=0; i<3; i++) spawnNext();
-    shark = { x: tanks[0].x + firstW/2, y: tanks[0].y - 20, vx:0, vy:0, angle:0, tail:0 };
-    // 初始化相机位置，确保鲨鱼在视野内
-    cam.x = 0; cam.tx = 0;
+    for(let i=0; i<4; i++) spawnNext();
+    shark = { x: tanks[0].x + (W * 0.12), y: tanks[0].y - 20, vx:0, vy:0, angle:0, tail:0 };
+    camX = 0; targetCamX = 0;
     particles = []; gameState = 'idle';
     msg.style.display = 'none';
 }
 
 function spawnNext() {
     const last = tanks[tanks.length-1];
-    const gap = W * 0.35 + Math.random() * (W * 0.25);
+    const gap = W * 0.4 + Math.random() * (W * 0.2);
     tanks.push(makeTank(last.x + last.w + gap));
 }
 
@@ -112,11 +110,42 @@ function draw() {
     time++;
     cx.fillStyle = '#050a12'; cx.fillRect(0,0,W,H);
     
-    // 动态相机逻辑
-    cam.x += (cam.tx - cam.x) * 0.1;
+    // --- 核心更新逻辑 ---
+    if (gameState === 'flying') {
+        shark.x += shark.vx; shark.y += shark.vy; shark.vy += 0.45;
+        shark.angle = Math.atan2(shark.vy, shark.vx);
+        shark.tail += 0.4;
+        
+        // 镜头平滑跟随：确保鲨鱼一直在屏幕左侧 30% 到 50% 之间
+        targetCamX = Math.max(0, shark.x - W * 0.3);
 
+        tanks.forEach((t, i) => {
+            if(shark.vy > 0 && shark.x > t.x && shark.x < t.x+t.w && shark.y > t.y && shark.y < t.y+30) {
+                playSound('hit');
+                for(let k=0; k<6; k++) particles.push({x:shark.x, y:t.y, vx:(Math.random()-0.5)*4, vy:-Math.random()*4, o:1});
+                shark.y = t.y - 12; shark.vx = 0; shark.vy = 0;
+                gameState = 'idle';
+                if(i > 0) { 
+                    score += i; scEl.textContent = score; 
+                    if(score>best){best=score; bsEl.textContent=best; localStorage.setItem('shark_best',best);} 
+                    tanks.splice(0,i); while(tanks.length<5) spawnNext(); 
+                }
+            }
+        });
+        
+        if(shark.y > H + 100 || shark.x < camX - 100) { 
+            gameState = 'dead'; msg.style.display = 'flex'; 
+        }
+    } else {
+        shark.tail += 0.05;
+        // 非飞行状态，镜头也要向目标平滑移动
+    }
+    
+    camX += (targetCamX - camX) * 0.1;
+
+    // --- 绘图层 ---
     cx.save(); 
-    cx.translate(-cam.x, 0);
+    cx.translate(-camX, 0);
     
     tanks.forEach(t => {
         cx.strokeStyle = t.color; cx.lineWidth = 2;
@@ -135,54 +164,29 @@ function draw() {
     drawShark(shark.x, shark.y, shark.angle, shark.tail);
     cx.restore();
 
+    // 蓄力条
     if(holding) {
         const p = Math.min((Date.now()-holdStart)/1200, 1);
         cx.fillStyle = '#0088ff'; cx.fillRect(0, H-4, W*p, 4);
     }
-
-    if(gameState === 'flying') {
-        shark.x += shark.vx; shark.y += shark.vy; shark.vy += 0.45;
-        shark.angle = Math.atan2(shark.vy, shark.vx);
-        shark.tail += 0.4;
-        
-        // 关键：当鲨鱼超过屏幕中间时，更新相机目标位置
-        if (shark.x - cam.x > W * 0.4) {
-            cam.tx = shark.x - W * 0.4;
-        }
-
-        tanks.forEach((t, i) => {
-            if(shark.vy > 0 && shark.x > t.x && shark.x < t.x+t.w && shark.y > t.y && shark.y < t.y+20) {
-                playSound('hit');
-                for(let k=0; k<6; k++) particles.push({x:shark.x, y:t.y, vx:(Math.random()-0.5)*4, vy:-Math.random()*4, o:1});
-                shark.y = t.y - 10; shark.vx = 0; shark.vy = 0;
-                gameState = 'idle';
-                if(i > 0) { 
-                    score += i; scEl.textContent = score; 
-                    if(score>best){best=score; bsEl.textContent=best; localStorage.setItem('shark_best',best);} 
-                    tanks.splice(0,i); while(tanks.length<4) spawnNext(); 
-                }
-            }
-        });
-        
-        if(shark.y > H + 100 || shark.x < cam.x - 100) { 
-            gameState = 'dead'; msg.style.display = 'flex'; 
-        }
-    } else {
-        shark.tail += 0.05;
-    }
+    
     requestAnimationFrame(draw);
 }
 
 const start = (e) => { 
     if(e.type === 'touchstart') e.preventDefault();
-    if(gameState === 'idle'){ holding = true; holdStart = Date.now(); if(audioCtx && audioCtx.state==='suspended') audioCtx.resume(); }
+    if(gameState === 'idle'){ 
+        holding = true; holdStart = Date.now(); 
+        if(audioCtx && audioCtx.state==='suspended') audioCtx.resume(); 
+    }
 };
 const end = () => {
     if(holding) {
         holding = false; playSound('jump');
         const p = Math.min((Date.now()-holdStart)/1200, 1);
-        shark.vx = W*0.018 + p * (W*0.028); 
-        shark.vy = -H*0.012 - p * (H*0.015);
+        // 稍微加大了基础弹跳力
+        shark.vx = W*0.02 + p * (W*0.028); 
+        shark.vy = -H*0.013 - p * (H*0.016);
         gameState = 'flying';
     }
 };
