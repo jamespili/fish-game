@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>小鱼跳一跳挑战 ⚡️</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        body { background: #050a12; height: 100vh; overflow: hidden; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; }
+        #gc { position: relative; flex: 1; width: 100%; max-width: 500px; margin: 0 auto; background: #0a1628; overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 30px; left: 0; right: 0; display: flex; justify-content: center; gap: 15px; pointer-events: none; z-index: 10; }
+        .stat { background: rgba(255,255,255,0.1); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2); border-radius: 20px; padding: 6px 15px; font-size: 14px; color: #e8f4ff; }
+        #msg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(8,20,50,0.95); display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; z-index: 100; padding: 40px; }
+        #msg h2 { font-size: 28px; color: #fff; margin-bottom: 10px; }
+        #msg p { color: #7aafd4; margin-bottom: 30px; line-height: 1.5; }
+        #msg button { background: linear-gradient(135deg, #1a6fc4, #0d4a8f); color: #fff; border: none; border-radius: 30px; padding: 15px 50px; font-size: 18px; font-weight: bold; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
+        #hint { position: absolute; bottom: 40px; width: 100%; text-align: center; color: rgba(160,210,255,0.5); font-size: 13px; pointer-events: none; }
+    </style>
+</head>
+<body>
+<div id="gc">
+    <div id="ui">
+        <div class="stat">得分 <span id="sc">0</span></div>
+        <div class="stat">最高 <span id="bs">0</span></div>
+    </div>
+    <canvas id="cv"></canvas>
+    <div id="msg">
+        <h2 id="mt">扑通！</h2>
+        <p id="mb">小鱼没跳进鱼缸</p >
+        <button onclick="restartGame()">再来一次</button>
+        <p style="margin-top:40px; font-size:12px; opacity:0.6;">点击右上角 ··· 分享给好友挑战比分</p >
+    </div>
+    <div id="hint">长按蓄力，松开起跳</div>
+</div>
+
+<script>
+const cv = document.getElementById('cv');
+const cx = cv.getContext('2d');
+const scEl = document.getElementById('sc'), bsEl = document.getElementById('bs');
+const msg = document.getElementById('msg'), mt = document.getElementById('mt'), mb = document.getElementById('mb');
+
+let W, H, gameState, score = 0, best = 0, holding = false, holdStart = 0;
+let tanks = [], fish, stars = [], time = 0, cam = { x: 0, tx: 0 };
+
+function resize() {
+    W = window.innerWidth > 500 ? 500 : window.innerWidth;
+    H = window.innerHeight;
+    cv.width = W; cv.height = H;
+}
+window.addEventListener('resize', resize);
+resize();
+
+function rnd(a, b) { return a + Math.random() * (b - a); }
+
+function makeTank(x) {
+    const w = rnd(75, 95), h = rnd(60, 90);
+    return { x, y: H - h - 100, w, h, bubbles: [], col: '#4db8ff' };
+}
+
+function initGame() {
+    score = 0; scEl.textContent = 0;
+    tanks = [makeTank(50)];
+    for(let i=0; i<3; i++) spawnNext();
+    fish = { x: 95, y: tanks[0].y - 20, vx: 0, vy: 0, onGround: true };
+    cam.x = 0; cam.tx = 0; gameState = 'idle';
+    msg.style.display = 'none';
+}
+
+function spawnNext() {
+    const last = tanks[tanks.length-1];
+    tanks.push(makeTank(last.x + last.w + rnd(100, 180)));
+}
+
+function update() {
+    time++;
+    cam.x += (cam.tx - cam.x) * 0.1;
+    if (gameState === 'flying') {
+        fish.x += fish.vx; fish.y += fish.vy;
+        fish.vy += 0.4;
+        cam.tx = fish.x - 80;
+        tanks.forEach((t, i) => {
+            if (fish.vy > 0 && fish.x > t.x && fish.x < t.x+t.w && fish.y > t.y && fish.y < t.y+15) {
+                fish.y = t.y - 15; fish.vx = 0; fish.vy = 0;
+                gameState = 'idle';
+                if(i > 0) { score += i; scEl.textContent = score; if(score > best){best=score; bsEl.textContent=best;} tanks.splice(0, i); while(tanks.length<4) spawnNext(); }
+            }
+        });
+        if (fish.y > H || fish.x < cam.x - 50) {
+            gameState = 'dead'; msg.style.display = 'flex';
+            mb.textContent = `你在挑战中获得了 ${score} 分`;
+        }
+    }
+}
+
+function draw() {
+    cx.clearRect(0,0,W,H);
+    cx.save(); cx.translate(-cam.x, 0);
+    tanks.forEach(t => {
+        cx.strokeStyle = '#6dcfff'; cx.lineWidth = 3;
+        cx.strokeRect(t.x, t.y, t.w, t.h);
+        cx.fillStyle = 'rgba(77,184,255,0.3)';
+        cx.fillRect(t.x, t.y+10, t.w, t.h-10);
+    });
+    cx.fillStyle = '#ff6b6b';
+    cx.beginPath(); cx.arc(fish.x, fish.y, 12, 0, Math.PI*2); cx.fill();
+    cx.restore();
+    if(holding) {
+        const p = Math.min((Date.now()-holdStart)/1200, 1);
+        cx.fillStyle = '#4db8ff'; cx.fillRect(0, H-5, W*p, 5);
+    }
+    update(); requestAnimationFrame(draw);
+}
+
+const startHold = () => { if(gameState==='idle'){holding=true; holdStart=Date.now();} };
+const endHold = () => {
+    if(holding) {
+        holding = false;
+        const p = Math.min((Date.now()-holdStart)/1200, 1);
+        fish.vx = 4 + p * 10; fish.vy = -6 - p * 12;
+        gameState = 'flying';
+    }
+};
+
+cv.addEventListener('touchstart', e => { e.preventDefault(); startHold(); });
+cv.addEventListener('touchend', e => { e.preventDefault(); endHold(); });
+cv.addEventListener('mousedown', startHold);
+window.addEventListener('mouseup', endHold);
+
+function restartGame() { initGame(); }
+initGame(); draw();
+</script>
+</body>
+</html>
