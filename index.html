@@ -3,277 +3,203 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>闪电鲨：深海跳跃 ⚡️</title>
+    <title>闪电鲨：深海跃动 ⚡️</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-        body { background: #020509; height: 100vh; overflow: hidden; font-family: -apple-system, "Helvetica Neue", sans-serif; display: flex; flex-direction: column; color: #fff; }
-        #gc { position: relative; flex: 1; width: 100%; max-width: 500px; margin: 0 auto; background: #050a12; overflow: hidden; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
+        body { background: #020509; height: 100vh; overflow: hidden; font-family: -apple-system, sans-serif; color: #fff; }
+        #gc { position: relative; width: 100%; max-width: 500px; height: 100vh; margin: 0 auto; background: #050a12; overflow: hidden; }
         canvas { display: block; width: 100%; height: 100%; }
-        
-        /* UI 样式：毛玻璃效果 */
-        #ui { position: absolute; top: calc(20px + env(safe-area-inset-top)); left: 0; right: 0; display: flex; justify-content: center; gap: 12px; pointer-events: none; z-index: 10; }
-        .stat { background: rgba(255,255,255,0.06); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); border-radius: 25px; padding: 8px 18px; font-size: 13px; font-weight: 500; color: #a0d2ff; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-        .stat span { color: #fff; font-weight: 700; font-size: 15px; margin-left: 4px; }
-
-        /* 游戏结束弹窗 */
-        #msg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(3,8,16,0.98); display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; z-index: 100; padding: 40px; backdrop-filter: blur(5px); }
-        #msg h2 { font-size: 32px; background: linear-gradient(135deg, #fff, #4db8ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 15px; letter-spacing: 1px; }
-        #msg p { color: #7aafd4; margin-bottom: 40px; line-height: 1.6; font-size: 15px; max-width: 280px; }
-        #msg button { background: linear-gradient(135deg, #0088ff, #004488); color: #fff; border: none; border-radius: 30px; padding: 16px 60px; font-size: 17px; font-weight: 700; letter-spacing: 1px; box-shadow: 0 8px 25px rgba(0,136,255,0.4); transition: transform 0.1s; }
-        #msg button:active { transform: scale(0.95); }
-        #share-hint { margin-top: 50px; font-size: 12px; color: rgba(160,210,255,0.4); line-height: 1.6; }
-
-        /* 蓄力提示 */
-        #hint { position: absolute; bottom: calc(30px + env(safe-area-inset-bottom)); width: 100%; text-align: center; color: rgba(160,210,255,0.3); font-size: 12px; font-weight: 400; pointer-events: none; letter-spacing: 1px; }
+        #ui { position: absolute; top: 40px; left: 0; right: 0; display: flex; justify-content: center; gap: 15px; pointer-events: none; z-index: 10; }
+        .stat { background: rgba(0, 136, 255, 0.1); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(0, 136, 255, 0.3); border-radius: 20px; padding: 8px 20px; font-size: 13px; color: #4db8ff; letter-spacing: 1px; }
+        .stat span { color: #fff; font-weight: bold; margin-left: 5px; font-size: 16px; }
+        #msg { position: absolute; inset: 0; background: rgba(3,8,16,0.95); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; backdrop-filter: blur(8px); }
+        #msg h2 { font-size: 32px; color: #fff; margin-bottom: 10px; text-shadow: 0 0 20px #0088ff; }
+        #msg p { color: #7aafd4; margin-bottom: 40px; }
+        #msg button { background: #0088ff; color: #fff; border: none; border-radius: 30px; padding: 16px 60px; font-size: 18px; font-weight: bold; }
+        #hint { position: absolute; bottom: 40px; width: 100%; text-align: center; color: rgba(77,184,255,0.4); font-size: 12px; }
     </style>
 </head>
 <body>
 <div id="gc">
     <div id="ui">
-        <div class="stat">DEPTH<span id="sc">0</span>m</div>
-        <div class="stat">BEST<span id="bs">0</span>m</div>
+        <div class="stat">DEPTH<span id="sc">0</span></div>
+        <div class="stat">BEST<span id="bs">0</span></div>
     </div>
     <canvas id="cv"></canvas>
     <div id="msg">
-        <h2 id="mt">DEEP LOST</h2>
-        <p id="mb">我在深海迷失了方向...</p >
-        <button onclick="restartGame()">RETRY</button>
-        <p id="share-hint">点击右上角 ··· 分享挑战<br>看看谁能潜得更深</p >
+        <h2>SHARK LOST</h2>
+        <p id="mb">小鲨鱼迷失在深海了...</p >
+        <button onclick="restartGame()">重新出发</button>
     </div>
-    <div id="hint">HOLD TO CHARGE, RELEASE TO JUMP</div>
+    <div id="hint">长按蓄力 · 闪电出击</div>
 </div>
 
 <script>
-// --- 核心配置 ---
-const cv = document.getElementById('cv');
-const cx = cv.getContext('2d');
-const scEl = document.getElementById('sc'), bsEl = document.getElementById('bs');
-const msg = document.getElementById('msg'), mb = document.getElementById('mb');
+const cv = document.getElementById('cv'), cx = cv.getContext('2d');
+const scEl = document.getElementById('sc'), bsEl = document.getElementById('bs'), msg = document.getElementById('msg'), mb = document.getElementById('mb');
 
 let W, H, gameState, score = 0, best = 0, holding = false, holdStart = 0, time = 0;
-let tanks = [], fish, stars = [], particles = [], cam = { x: 0, tx: 0 };
+let tanks = [], shark, stars = [], particles = [], cam = { x: 0, tx: 0 };
 
-// --- 初始化与适配 ---
+// --- 声音合成器逻辑 ---
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+
+function playSound(type) {
+    if (!audioCtx) audioCtx = new AudioCtx();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+
+    if (type === 'jump') {
+        osc.type = 'triangle'; osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+    } else if (type === 'hit') {
+        osc.type = 'sine'; osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+    }
+}
+
 function resize() {
-    W = window.innerWidth > 500 ? 500 : window.innerWidth;
-    H = window.innerHeight;
-    cv.width = W * window.devicePixelRatio; // 高清屏适配
-    cv.height = H * window.devicePixelRatio;
-    cx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    W = Math.min(window.innerWidth, 500); H = window.innerHeight;
+    cv.width = W * devicePixelRatio; cv.height = H * devicePixelRatio;
+    cx.scale(devicePixelRatio, devicePixelRatio);
 }
-window.addEventListener('resize', resize);
-resize();
+window.addEventListener('resize', resize); resize();
 
-function rnd(a, b) { return a + Math.random() * (b - a); }
-
-// 初始化星星背景
-for(let i=0; i<50; i++) stars.push({ x: rnd(0, W*2), y: rnd(0, H*0.8), r: rnd(0.5, 1.5), o: rnd(0.1, 0.5) });
-
-// --- 对象生成逻辑 ---
 function makeTank(x) {
-    const w = rnd(75, 95), h = rnd(65, 100);
-    const tank = { 
-        x, y: H - h - 120, w, h, 
-        bubbles: [], 
-        color: ['#4db8ff', '#00ffcc', '#b8ffff'][Math.floor(rnd(0,3))] 
-    };
-    // 生成鱼缸内气泡
-    for(let i=0; i<5; i++) tank.bubbles.push({ x: rnd(10, w-10), y: rnd(10, h-10), r: rnd(1, 3), s: rnd(0.2, 0.5) });
-    return tank;
-}
-
-function spawnNext() {
-    const last = tanks[tanks.length-1];
-    tanks.push(makeTank(last.x + last.w + rnd(110, 190)));
+    const w = 80 + Math.random()*20, h = 60 + Math.random()*40;
+    return { x, y: H - h - 120, w, h, color: '#00ccff' };
 }
 
 function initGame() {
     score = 0; scEl.textContent = 0;
-    tanks = [makeTank(W/2 - 45)]; // 第一个缸在中间
-    tanks[0].w = 90; tanks[0].y = H - 90 - 120;
+    tanks = [makeTank(W/2 - 45)]; 
     for(let i=0; i<3; i++) spawnNext();
-    fish = { 
-        x: tanks[0].x + tanks[0].w/2, y: tanks[0].y - 15, 
-        vx: 0, vy: 0, angle: 0, tail: 0,
-        color: '#ff6b6b', glow: '#ffcccc'
-    };
-    cam.x = fish.x - W/2; cam.tx = cam.x;
+    shark = { x: tanks[0].x+45, y: tanks[0].y-20, vx:0, vy:0, angle:0, tail:0 };
+    cam.x = shark.x - W/2; cam.tx = cam.x;
     particles = []; gameState = 'idle';
     msg.style.display = 'none';
 }
 
-// --- 核心渲染引擎 (精致版) ---
+function spawnNext() {
+    const last = tanks[tanks.length-1];
+    tanks.push(makeTank(last.x + last.w + 120 + Math.random()*80));
+}
+
+// --- 绘制鲨鱼造型 ---
+function drawShark(x, y, ang, tail) {
+    cx.save();
+    cx.translate(x, y);
+    cx.rotate(ang);
+    
+    // 鲨鱼身体渐变
+    const g = cx.createLinearGradient(-20, 0, 20, 0);
+    g.addColorStop(0, '#1a75ff'); g.addColorStop(1, '#80b3ff');
+    cx.fillStyle = g;
+    cx.shadowBlur = 10; cx.shadowColor = '#4db8ff';
+
+    // 身体 (流线型)
+    cx.beginPath();
+    cx.ellipse(0, 0, 22, 10, 0, 0, Math.PI*2);
+    cx.fill();
+
+    // 背鳍
+    cx.beginPath();
+    cx.moveTo(-5, -8); cx.quadraticCurveTo(0, -18, 10, -5);
+    cx.fill();
+
+    // 尾巴 (摇摆)
+    const tw = Math.sin(tail) * 5;
+    cx.beginPath();
+    cx.moveTo(-18, 0);
+    cx.lineTo(-30, -10 + tw);
+    cx.lineTo(-26, 0);
+    cx.lineTo(-30, 10 + tw);
+    cx.fill();
+
+    // 眼睛 (凶萌一点)
+    cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(12, -3, 2.5, 0, Math.PI*2); cx.fill();
+    cx.fillStyle = '#000'; cx.beginPath(); cx.arc(13, -3, 1.2, 0, Math.PI*2); cx.fill();
+    
+    cx.restore();
+}
+
 function draw() {
     time++;
-    cx.clearRect(0,0,W,H);
+    cx.fillStyle = '#050a12'; cx.fillRect(0,0,W,H);
     
-    // 1. 绘制深海背景渐变
-    const bgGrd = cx.createLinearGradient(0, 0, 0, H);
-    bgGrd.addColorStop(0, '#020509');
-    bgGrd.addColorStop(1, '#081326');
-    cx.fillStyle = bgGrd;
-    cx.fillRect(0, 0, W, H);
+    cx.save(); cx.translate(-cam.x, 0);
 
-    // 2. 绘制星星 (带微弱闪烁)
-    stars.forEach(s => {
-        cx.fillStyle = `rgba(160, 210, 255, ${s.o + Math.sin(time*0.02+s.x)*0.1})`;
-        cx.beginPath(); cx.arc(s.x - cam.x*0.2, s.y, s.r, 0, Math.PI*2); cx.fill();
-    });
-
-    cx.save(); 
-    cx.translate(-cam.x, 0);
-
-    // 3. 绘制鱼缸 (霓虹玻璃质感)
     tanks.forEach(t => {
-        // 鱼缸霓虹边缘
-        cx.save();
-        cx.strokeStyle = t.color;
-        cx.lineWidth = 3;
-        cx.shadowColor = t.color;
-        cx.shadowBlur = 15; // 发光特效
-        cx.lineJoin = 'round';
+        cx.strokeStyle = t.color; cx.lineWidth = 3;
+        cx.shadowBlur = 15; cx.shadowColor = t.color;
         cx.strokeRect(t.x, t.y, t.w, t.h);
-        cx.restore();
-
-        // 鱼缸内液体 (半透明渐变)
-        const waterGrd = cx.createLinearGradient(t.x, t.y, t.x, t.y+t.h);
-        waterGrd.addColorStop(0, 'rgba(77,184,255,0.1)');
-        waterGrd.addColorStop(1, 'rgba(0,68,136,0.3)');
-        cx.fillStyle = waterGrd;
-        cx.fillRect(t.x+1.5, t.y+1.5, t.w-3, t.h-3);
-
-        // 液体顶部亮边
-        cx.fillStyle = 'rgba(255,255,255,0.2)';
-        cx.fillRect(t.x+5, t.y+10, t.w-10, 2);
-
-        // 内部气泡动态
-        t.bubbles.forEach(b => {
-            b.y -= b.s; if(b.y < 10) b.y = t.h - 10;
-            cx.fillStyle = `rgba(255,255,255,${0.1 + Math.sin(time*0.05+b.x)*0.1})`;
-            cx.beginPath(); cx.arc(t.x + b.x, t.y + b.y, b.r, 0, Math.PI*2); cx.fill();
-        });
+        cx.fillStyle = 'rgba(0,204,255,0.15)'; cx.fillRect(t.x, t.y+5, t.w, t.h-5);
     });
 
-    // 4. 绘制小鱼 (发光生物质感)
-    cx.save();
-    cx.translate(fish.x, fish.y);
-    if(gameState === 'flying') fish.angle = Math.atan2(fish.vy, fish.vx);
-    else fish.angle += (0 - fish.angle) * 0.1;
-    cx.rotate(fish.angle);
-    
-    // 鱼体发光
-    cx.shadowColor = fish.glow;
-    cx.shadowBlur = 12;
-    
-    // 鱼身体 (椭圆)
-    cx.fillStyle = fish.color;
-    cx.beginPath(); cx.ellipse(0, 0, 16, 9, 0, 0, Math.PI*2); cx.fill();
-    
-    // 鱼尾巴 (动态摇摆)
-    cx.shadowBlur = 0;
-    fish.tail += (gameState === 'flying' ? 0.3 : 0.05);
-    const tailWmb = Math.sin(fish.tail) * 4;
-    cx.beginPath();
-    cx.moveTo(-14, 0);
-    cx.lineTo(-24, -8 + tailWmb);
-    cx.lineTo(-22, 0);
-    cx.lineTo(-24, 8 + tailWmb);
-    cx.closePath(); cx.fill();
-    
-    // 眼睛
-    cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(8, -2, 2.5, 0, Math.PI*2); cx.fill();
-    cx.fillStyle = '#000'; cx.beginPath(); cx.arc(9, -2, 1, 0, Math.PI*2); cx.fill();
-    cx.restore();
-
-    // 5. 绘制粒子特效
     particles.forEach((p, i) => {
-        p.x += p.vx; p.y += p.vy; p.vy += 0.02; p.o -= 0.01; p.r *= 0.98;
+        p.x += p.vx; p.y += p.vy; p.vy += 0.1; p.o -= 0.02;
         if(p.o <= 0) particles.splice(i, 1);
         cx.fillStyle = `rgba(255,255,255,${p.o})`;
-        cx.beginPath(); cx.arc(p.x, p.y, p.r, 0, Math.PI*2); cx.fill();
+        cx.beginPath(); cx.arc(p.x, p.y, 2, 0, Math.PI*2); cx.fill();
     });
 
+    drawShark(shark.x, shark.y, shark.angle, shark.tail);
     cx.restore();
 
-    // 6. 绘制底部蓄力条 (极简亮线)
     if(holding) {
         const p = Math.min((Date.now()-holdStart)/1200, 1);
-        const barGrd = cx.createLinearGradient(0, 0, W, 0);
-        barGrd.addColorStop(0, '#050a12');
-        barGrd.addColorStop(0.5, '#4db8ff');
-        barGrd.addColorStop(1, '#050a12');
-        cx.fillStyle = barGrd;
-        cx.globalAlpha = p;
-        cx.fillRect(W/2 - (W*0.8*p)/2, H-3, W*0.8*p, 3);
-        cx.globalAlpha = 1;
+        cx.fillStyle = '#0088ff'; cx.fillRect(0, H-4, W*p, 4);
     }
 
-    update();
+    if(gameState === 'flying') {
+        shark.x += shark.vx; shark.y += shark.vy; shark.vy += 0.45;
+        shark.angle = Math.atan2(shark.vy, shark.vx);
+        shark.tail += 0.4;
+        cam.tx = shark.x - W/2 + 50;
+        
+        tanks.forEach((t, i) => {
+            if(shark.vy > 0 && shark.x > t.x+5 && shark.x < t.x+t.w-5 && shark.y > t.y && shark.y < t.y+20) {
+                playSound('hit');
+                for(let k=0; k<8; k++) particles.push({x:shark.x, y:t.y, vx:rnd(-2,2), vy:rnd(-3,-1), o:1});
+                shark.y = t.y - 10; shark.vx = 0; shark.vy = 0;
+                gameState = 'idle';
+                if(i > 0) { score += i; scEl.textContent = score; if(score>best){best=score; bsEl.textContent=best; localStorage.setItem('shark_best',best);} tanks.splice(0,i); while(tanks.length<4) spawnNext(); }
+            }
+        });
+        if(shark.y > H || shark.x < cam.x-20) { gameState = 'dead'; msg.style.display = 'flex'; }
+    } else {
+        shark.tail += 0.05;
+        cam.x += (cam.tx - cam.x) * 0.1;
+    }
     requestAnimationFrame(draw);
 }
 
-// --- 游戏逻辑与物体交互 ---
-function update() {
-    cam.x += (cam.tx - cam.x) * 0.1; // 平滑镜头
-    if (gameState === 'flying') {
-        fish.x += fish.vx; fish.y += fish.vy;
-        fish.vy += 0.42; // 重力
-        cam.tx = fish.x - W/2 + 50; // 镜头跟随
-        
-        // 碰撞检测
-        tanks.forEach((t, i) => {
-            // 简化落点判定：速度向下且处于缸口范围内
-            if (fish.vy > 0 && fish.x > t.x+5 && fish.x < t.x+t.w-5 && fish.y > t.y && fish.y < t.y+20) {
-                // 落水特效
-                for(let k=0; k<10; k++) particles.push({ x:fish.x, y:t.y+10, vx:rnd(-2,2), vy:rnd(-2,-5), r:rnd(1,3), o:1 });
-                
-                fish.y = t.y - 10; fish.vx = 0; fish.vy = 0;
-                gameState = 'idle';
-                
-                // 得分与生成新缸
-                if(i > 0) { 
-                    score += i; scEl.textContent = score; 
-                    if(score > best){ best=score; bsEl.textContent=best; localStorage.setItem('fish_best', best); } 
-                    tanks.splice(0, i); // 移除身后的缸
-                    while(tanks.length<4) spawnNext(); 
-                }
-            }
-        });
-        
-        // 失败判定
-        if (fish.y > H + 50 || fish.x < cam.x - 20) {
-            gameState = 'dead'; msg.style.display = 'flex';
-            mb.innerHTML = `你在潜入 <b>${score}</b> 米深处迷失了...<br>这下面暗得可怕。`;
-        }
-    }
-}
-
-// --- 交互输入 ---
-const startHold = (e) => { 
-    if(e.type === 'touchstart') e.preventDefault(); 
-    if(gameState==='idle'){ holding=true; holdStart=Date.now(); fish.tail=0; } 
+const handleStart = (e) => { 
+    if(e.type==='touchstart') e.preventDefault();
+    if(gameState==='idle'){ holding=true; holdStart=Date.now(); if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); }
 };
-const endHold = () => {
+const handleEnd = () => {
     if(holding) {
-        holding = false;
+        holding = false; playSound('jump');
         const p = Math.min((Date.now()-holdStart)/1200, 1);
-        // 物理参数微调
-        fish.vx = 4.5 + p * 11; 
-        fish.vy = -7 - p * 13;
+        shark.vx = 5 + p * 10; shark.vy = -8 - p * 12;
         gameState = 'flying';
-        // 起跳特效
-        for(let k=0; k<5; k++) particles.push({ x:fish.x, y:fish.y+10, vx:rnd(-1,1), vy:rnd(1,3), r:rnd(1,2), o:0.5 });
     }
 };
 
-cv.addEventListener('touchstart', startHold);
-window.addEventListener('touchend', endHold);
-cv.addEventListener('mousedown', startHold);
-window.addEventListener('mouseup', endHold);
+cv.addEventListener('touchstart', handleStart); window.addEventListener('touchend', handleEnd);
+cv.addEventListener('mousedown', handleStart); window.addEventListener('mouseup', handleEnd);
 
-// --- 启动 ---
 function restartGame() { initGame(); }
-best = localStorage.getItem('fish_best') || 0; bsEl.textContent = best;
+best = localStorage.getItem('shark_best') || 0; bsEl.textContent = best;
 initGame(); draw();
 </script>
 </body>
