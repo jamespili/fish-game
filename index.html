@@ -31,7 +31,7 @@
         <p id="mb">深海中潜伏着未知的危险...</p >
         <button onclick="restartGame()">再次挑战</button>
     </div>
-    <div id="hint">长按蓄力 · 闪电出击</div>
+    <div id="hint">点触即跳 · 长按蓄力</div>
 </div>
 
 <script>
@@ -51,16 +51,16 @@ function playSound(type) {
         const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
         osc.connect(gain); gain.connect(audioCtx.destination);
         if (type === 'jump') {
-            osc.frequency.setValueAtTime(200, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.1);
-            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
-            osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+            osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(550, audioCtx.currentTime + 0.08);
+            gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.15);
         } else if (type === 'hit') {
-            osc.frequency.setValueAtTime(140, audioCtx.currentTime);
-            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-            osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+            osc.frequency.setValueAtTime(130, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.35);
         }
     } catch(e){}
 }
@@ -74,16 +74,16 @@ function resize() {
 window.addEventListener('resize', resize); resize();
 
 function makeTank(x) {
-    const tankW = W * 0.22; const tankH = H * 0.12;
-    const t = { x, y: H - tankH - 120, w: tankW, h: tankH, color: '#00ccff', offset: Math.random()*10 };
+    const tankW = W * 0.23; const tankH = H * 0.12;
+    const t = { x, y: H - tankH - 120, w: tankW, h: tankH, color: '#00ccff', offset: Math.random()*20 };
     t.bubbles = [];
-    for(let i=0; i<3; i++) t.bubbles.push({x: Math.random()*t.w, y: Math.random()*t.h, r: 1, s: 0.3+Math.random()*0.3});
+    for(let i=0; i<3; i++) t.bubbles.push({x: Math.random()*t.w, y: Math.random()*t.h, r: 1, s: 0.2+Math.random()*0.3});
     return t;
 }
 
 function initGame() {
     score = 0; scEl.textContent = 0;
-    tanks = [makeTank(W * 0.1)]; 
+    tanks = [makeTank(W * 0.12)]; 
     for(let i=0; i<4; i++) spawnNext();
     shark = { x: tanks[0].x + tanks[0].w/2, y: tanks[0].y - 12, vx: 0, vy: 0, angle: 0, tail: 0 };
     camX = 0; targetCamX = 0;
@@ -93,14 +93,14 @@ function initGame() {
 
 function spawnNext() {
     const last = tanks[tanks.length-1];
-    // 距离远近不一：W * 0.3 到 W * 0.7 之间大幅度随机
-    const gap = W * (0.3 + Math.random() * 0.4);
+    // 距离远近不一：W * 0.3 到 W * 0.7 之间
+    const gap = W * (0.32 + Math.random() * 0.38);
     tanks.push(makeTank(last.x + last.w + gap));
 }
 
 function drawShark(x, y, ang, tail, isSwimming) {
     cx.save();
-    const swimY = isSwimming ? Math.sin(time * 0.08) * 4 : 0;
+    const swimY = isSwimming ? Math.sin(time * 0.08) * 3.5 : 0;
     cx.translate(x, y + swimY); 
     cx.rotate(ang);
     const g = cx.createLinearGradient(-18, 0, 18, 0);
@@ -109,7 +109,7 @@ function drawShark(x, y, ang, tail, isSwimming) {
     cx.beginPath(); cx.ellipse(0, 0, 20, 9, 0, 0, Math.PI*2); cx.fill();
     cx.beginPath(); cx.moveTo(-4, -7); cx.quadraticCurveTo(2, -15, 9, -5); cx.fill();
     const tw = Math.sin(tail) * 5;
-    cx.beginPath(); cx.moveTo(-16, 0); cx.lineTo(-27, -8 + tw); cx.lineTo(-23, 0); cx.lineTo(-27, 8 + tw); cx.fill();
+    cx.beginPath(); cx.moveTo(-16, 0); cx.lineTo(-28, -9 + tw); cx.lineTo(-24, 0); cx.lineTo(-28, 9 + tw); cx.fill();
     cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(11, -2, 2.2, 0, Math.PI*2); cx.fill();
     cx.fillStyle = '#000'; cx.beginPath(); cx.arc(12, -2, 1, 0, Math.PI*2); cx.fill();
     cx.restore();
@@ -120,15 +120,15 @@ function draw() {
     cx.fillStyle = '#050a12'; cx.fillRect(0,0,W,H);
     
     if (gameState === 'flying') {
-        shark.x += shark.vx; shark.y += shark.vy; shark.vy += 0.48; // 增加重力感
+        shark.x += shark.vx; shark.y += shark.vy; shark.vy += 0.48; 
         shark.angle = Math.atan2(shark.vy, shark.vx);
         shark.tail += 0.4;
-        targetCamX = Math.max(camX, shark.x - W * 0.3);
+        targetCamX = Math.max(camX, shark.x - W * 0.35);
 
         tanks.forEach((t, i) => {
-            if(shark.vy > 0 && shark.x > t.x && shark.x < t.x+t.w && shark.y > t.y-10 && shark.y < t.y+30) {
+            if(shark.vy > 0 && shark.x > t.x - 5 && shark.x < t.x+t.w + 5 && shark.y > t.y-10 && shark.y < t.y+30) {
                 playSound('hit');
-                for(let k=0; k<10; k++) particles.push({x:shark.x, y:t.y, vx:(Math.random()-0.5)*4, vy:-Math.random()*4, o:1});
+                for(let k=0; k<8; k++) particles.push({x:shark.x, y:t.y, vx:(Math.random()-0.5)*5, vy:-Math.random()*4, o:1});
                 shark.y = t.y - 12; shark.vx = 0; shark.vy = 0; shark.angle = 0;
                 gameState = 'idle';
                 if(i > 0) { 
@@ -138,7 +138,9 @@ function draw() {
                 }
             }
         });
-        if(shark.y > H + 50 || shark.x < camX - 100) { gameState = 'dead'; msg.style.display = 'flex'; }
+        if(shark.y > H + 60 || shark.x < camX - 120) { 
+            gameState = 'dead'; msg.style.display = 'flex'; 
+        }
     } else {
         shark.tail += 0.06;
     }
@@ -153,7 +155,7 @@ function draw() {
         cx.fillStyle = 'rgba(0,204,255,0.15)';
         cx.beginPath(); cx.moveTo(t.x, t.y + t.h);
         for(let tx=0; tx<=t.w; tx+=5) {
-            const ty = Math.sin(tx*0.06 + time*0.05 + t.offset) * 3;
+            const ty = Math.sin(tx*0.06 + time*0.05 + t.offset) * 3.5;
             cx.lineTo(t.x + tx, t.y + 10 + ty);
         }
         cx.lineTo(t.x + t.w, t.y + t.h); cx.fill();
@@ -169,34 +171,36 @@ function draw() {
         p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.o -= 0.02;
         if(p.o <= 0) particles.splice(i, 1);
         cx.fillStyle = `rgba(255,255,255,${p.o})`;
-        cx.beginPath(); cx.arc(p.x, p.y, 2, 0, Math.PI*2); cx.fill();
+        cx.beginPath(); cx.arc(p.x, p.y, 2.2, 0, Math.PI*2); cx.fill();
     });
     
     drawShark(shark.x, shark.y, shark.angle, shark.tail, gameState === 'idle');
     cx.restore();
 
     if(holding) {
-        const p = Math.min((Date.now()-holdStart)/1500, 1);
-        cx.fillStyle = '#0088ff'; cx.fillRect(0, H-4, W*p, 4);
+        const p = Math.min((Date.now()-holdStart)/1400, 1);
+        cx.fillStyle = '#0088ff'; cx.shadowBlur = 10; cx.shadowColor = '#0088ff';
+        cx.fillRect(0, H-4, W*p, 4);
+        cx.shadowBlur = 0;
     }
     requestAnimationFrame(draw);
 }
 
 const start = (e) => { 
     if(e.type === 'touchstart') e.preventDefault();
-    if(gameState === 'idle'){ holding = true; holdStart = Date.now(); }
+    if(gameState === 'idle'){ 
+        holding = true; holdStart = Date.now(); 
+        if(!audioCtx) audioCtx = new AudioCtx();
+    }
 };
 const end = () => {
     if(holding) {
         holding = false;
-        const duration = Date.now() - holdStart;
-        if (duration < 150) return; // 增加死区，防止误触灵敏度过高
-        
         playSound('jump');
-        const p = Math.min(duration/1500, 1);
-        // 重新调校的动力学公式：更平稳的初速度
-        shark.vx = W*0.015 + p * (W*0.035); 
-        shark.vy = -H*0.012 - p * (H*0.022);
+        const p = Math.min((Date.now() - holdStart)/1400, 1);
+        // 彻底移除起跳阈值：只要点到就赋予基础初速度
+        shark.vx = W*0.012 + p * (W*0.038); 
+        shark.vy = -H*0.010 - p * (H*0.024);
         gameState = 'flying';
     }
 };
