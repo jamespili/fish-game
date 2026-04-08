@@ -6,17 +6,17 @@
     <title>闪电鲨：深海跃动 ⚡️</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-        body { background: #020509; height: 100vh; overflow: hidden; font-family: -apple-system, sans-serif; color: #fff; }
-        #gc { position: relative; width: 100%; max-width: 500px; height: 100vh; margin: 0 auto; background: #050a12; overflow: hidden; }
+        body { background: #020509; height: 100vh; overflow: hidden; font-family: -apple-system, sans-serif; color: #fff; position: fixed; width: 100%; }
+        #gc { position: relative; width: 100%; height: 100%; background: #050a12; overflow: hidden; }
         canvas { display: block; width: 100%; height: 100%; }
-        #ui { position: absolute; top: 40px; left: 0; right: 0; display: flex; justify-content: center; gap: 15px; pointer-events: none; z-index: 10; }
-        .stat { background: rgba(0, 136, 255, 0.1); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(0, 136, 255, 0.3); border-radius: 20px; padding: 8px 20px; font-size: 13px; color: #4db8ff; letter-spacing: 1px; }
-        .stat span { color: #fff; font-weight: bold; margin-left: 5px; font-size: 16px; }
-        #msg { position: absolute; inset: 0; background: rgba(3,8,16,0.95); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; backdrop-filter: blur(8px); }
-        #msg h2 { font-size: 32px; color: #fff; margin-bottom: 10px; text-shadow: 0 0 20px #0088ff; }
-        #msg p { color: #7aafd4; margin-bottom: 40px; }
-        #msg button { background: #0088ff; color: #fff; border: none; border-radius: 30px; padding: 16px 60px; font-size: 18px; font-weight: bold; }
-        #hint { position: absolute; bottom: 40px; width: 100%; text-align: center; color: rgba(77,184,255,0.4); font-size: 12px; }
+        #ui { position: absolute; top: 50px; left: 0; right: 0; display: flex; justify-content: center; gap: 12px; pointer-events: none; z-index: 10; }
+        .stat { background: rgba(0, 136, 255, 0.15); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(0, 136, 255, 0.3); border-radius: 20px; padding: 6px 16px; font-size: 12px; color: #4db8ff; }
+        .stat span { color: #fff; font-weight: bold; margin-left: 4px; font-size: 15px; }
+        #msg { position: absolute; inset: 0; background: rgba(3,8,16,0.96); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; backdrop-filter: blur(8px); }
+        #msg h2 { font-size: 28px; color: #fff; margin-bottom: 10px; text-shadow: 0 0 15px #0088ff; }
+        #msg p { color: #7aafd4; margin-bottom: 30px; font-size: 14px; }
+        #msg button { background: #0088ff; color: #fff; border: none; border-radius: 30px; padding: 14px 50px; font-size: 16px; font-weight: bold; box-shadow: 0 5px 15px rgba(0,136,255,0.4); }
+        #hint { position: absolute; bottom: 50px; width: 100%; text-align: center; color: rgba(77,184,255,0.4); font-size: 12px; letter-spacing: 1px; }
     </style>
 </head>
 <body>
@@ -36,12 +36,11 @@
 
 <script>
 const cv = document.getElementById('cv'), cx = cv.getContext('2d');
-const scEl = document.getElementById('sc'), bsEl = document.getElementById('bs'), msg = document.getElementById('msg'), mb = document.getElementById('mb');
+const scEl = document.getElementById('sc'), bsEl = document.getElementById('bs'), msg = document.getElementById('msg');
 
 let W, H, gameState, score = 0, best = 0, holding = false, holdStart = 0, time = 0;
-let tanks = [], shark, stars = [], particles = [], cam = { x: 0, tx: 0 };
+let tanks = [], shark, particles = [], cam = { x: 0, tx: 0 };
 
-// --- 声音合成器逻辑 ---
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
 
@@ -50,84 +49,62 @@ function playSound(type) {
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.connect(gain); gain.connect(audioCtx.destination);
-
     if (type === 'jump') {
-        osc.type = 'triangle'; osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(160, audioCtx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.1);
-        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
         osc.start(); osc.stop(audioCtx.currentTime + 0.2);
     } else if (type === 'hit') {
-        osc.type = 'sine'; osc.frequency.setValueAtTime(100, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.3);
-        gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+        osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.3);
     }
 }
 
 function resize() {
-    W = Math.min(window.innerWidth, 500); H = window.innerHeight;
-    cv.width = W * devicePixelRatio; cv.height = H * devicePixelRatio;
-    cx.scale(devicePixelRatio, devicePixelRatio);
+    W = window.innerWidth; H = window.innerHeight;
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = W * dpr; cv.height = H * dpr;
+    cx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 window.addEventListener('resize', resize); resize();
 
 function makeTank(x) {
-    const w = 80 + Math.random()*20, h = 60 + Math.random()*40;
-    return { x, y: H - h - 120, w, h, color: '#00ccff' };
+    const tankW = W * 0.22; const tankH = H * 0.12;
+    return { x, y: H - tankH - 120, w: tankW, h: tankH, color: '#00ccff' };
 }
 
 function initGame() {
     score = 0; scEl.textContent = 0;
-    tanks = [makeTank(W/2 - 45)]; 
+    const firstW = W * 0.22;
+    // 强制第一只鱼缸在屏幕偏左一点，给起跳留出空间
+    tanks = [makeTank(W * 0.15)]; 
     for(let i=0; i<3; i++) spawnNext();
-    shark = { x: tanks[0].x+45, y: tanks[0].y-20, vx:0, vy:0, angle:0, tail:0 };
-    cam.x = shark.x - W/2; cam.tx = cam.x;
+    shark = { x: tanks[0].x + firstW/2, y: tanks[0].y - 20, vx:0, vy:0, angle:0, tail:0 };
+    // 初始化相机位置，确保鲨鱼在视野内
+    cam.x = 0; cam.tx = 0;
     particles = []; gameState = 'idle';
     msg.style.display = 'none';
 }
 
 function spawnNext() {
     const last = tanks[tanks.length-1];
-    tanks.push(makeTank(last.x + last.w + 120 + Math.random()*80));
+    const gap = W * 0.35 + Math.random() * (W * 0.25);
+    tanks.push(makeTank(last.x + last.w + gap));
 }
 
-// --- 绘制鲨鱼造型 ---
 function drawShark(x, y, ang, tail) {
-    cx.save();
-    cx.translate(x, y);
-    cx.rotate(ang);
-    
-    // 鲨鱼身体渐变
-    const g = cx.createLinearGradient(-20, 0, 20, 0);
+    cx.save(); cx.translate(x, y); cx.rotate(ang);
+    const g = cx.createLinearGradient(-15, 0, 15, 0);
     g.addColorStop(0, '#1a75ff'); g.addColorStop(1, '#80b3ff');
-    cx.fillStyle = g;
-    cx.shadowBlur = 10; cx.shadowColor = '#4db8ff';
-
-    // 身体 (流线型)
-    cx.beginPath();
-    cx.ellipse(0, 0, 22, 10, 0, 0, Math.PI*2);
-    cx.fill();
-
-    // 背鳍
-    cx.beginPath();
-    cx.moveTo(-5, -8); cx.quadraticCurveTo(0, -18, 10, -5);
-    cx.fill();
-
-    // 尾巴 (摇摆)
-    const tw = Math.sin(tail) * 5;
-    cx.beginPath();
-    cx.moveTo(-18, 0);
-    cx.lineTo(-30, -10 + tw);
-    cx.lineTo(-26, 0);
-    cx.lineTo(-30, 10 + tw);
-    cx.fill();
-
-    // 眼睛 (凶萌一点)
-    cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(12, -3, 2.5, 0, Math.PI*2); cx.fill();
-    cx.fillStyle = '#000'; cx.beginPath(); cx.arc(13, -3, 1.2, 0, Math.PI*2); cx.fill();
-    
+    cx.fillStyle = g; cx.shadowBlur = 10; cx.shadowColor = '#4db8ff';
+    cx.beginPath(); cx.ellipse(0, 0, 18, 8, 0, 0, Math.PI*2); cx.fill();
+    cx.beginPath(); cx.moveTo(-4, -6); cx.quadraticCurveTo(0, -14, 8, -4); cx.fill();
+    const tw = Math.sin(tail) * 4;
+    cx.beginPath(); cx.moveTo(-15, 0); cx.lineTo(-24, -7 + tw); cx.lineTo(-21, 0); cx.lineTo(-24, 7 + tw); cx.fill();
+    cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(10, -2, 2, 0, Math.PI*2); cx.fill();
     cx.restore();
 }
 
@@ -135,22 +112,26 @@ function draw() {
     time++;
     cx.fillStyle = '#050a12'; cx.fillRect(0,0,W,H);
     
-    cx.save(); cx.translate(-cam.x, 0);
+    // 动态相机逻辑
+    cam.x += (cam.tx - cam.x) * 0.1;
 
+    cx.save(); 
+    cx.translate(-cam.x, 0);
+    
     tanks.forEach(t => {
-        cx.strokeStyle = t.color; cx.lineWidth = 3;
-        cx.shadowBlur = 15; cx.shadowColor = t.color;
+        cx.strokeStyle = t.color; cx.lineWidth = 2;
+        cx.shadowBlur = 12; cx.shadowColor = t.color;
         cx.strokeRect(t.x, t.y, t.w, t.h);
-        cx.fillStyle = 'rgba(0,204,255,0.15)'; cx.fillRect(t.x, t.y+5, t.w, t.h-5);
+        cx.fillStyle = 'rgba(0,204,255,0.1)'; cx.fillRect(t.x, t.y+5, t.w, t.h-5);
     });
-
+    
     particles.forEach((p, i) => {
         p.x += p.vx; p.y += p.vy; p.vy += 0.1; p.o -= 0.02;
         if(p.o <= 0) particles.splice(i, 1);
         cx.fillStyle = `rgba(255,255,255,${p.o})`;
         cx.beginPath(); cx.arc(p.x, p.y, 2, 0, Math.PI*2); cx.fill();
     });
-
+    
     drawShark(shark.x, shark.y, shark.angle, shark.tail);
     cx.restore();
 
@@ -163,42 +144,51 @@ function draw() {
         shark.x += shark.vx; shark.y += shark.vy; shark.vy += 0.45;
         shark.angle = Math.atan2(shark.vy, shark.vx);
         shark.tail += 0.4;
-        cam.tx = shark.x - W/2 + 50;
         
+        // 关键：当鲨鱼超过屏幕中间时，更新相机目标位置
+        if (shark.x - cam.x > W * 0.4) {
+            cam.tx = shark.x - W * 0.4;
+        }
+
         tanks.forEach((t, i) => {
-            if(shark.vy > 0 && shark.x > t.x+5 && shark.x < t.x+t.w-5 && shark.y > t.y && shark.y < t.y+20) {
+            if(shark.vy > 0 && shark.x > t.x && shark.x < t.x+t.w && shark.y > t.y && shark.y < t.y+20) {
                 playSound('hit');
-                for(let k=0; k<8; k++) particles.push({x:shark.x, y:t.y, vx:rnd(-2,2), vy:rnd(-3,-1), o:1});
+                for(let k=0; k<6; k++) particles.push({x:shark.x, y:t.y, vx:(Math.random()-0.5)*4, vy:-Math.random()*4, o:1});
                 shark.y = t.y - 10; shark.vx = 0; shark.vy = 0;
                 gameState = 'idle';
-                if(i > 0) { score += i; scEl.textContent = score; if(score>best){best=score; bsEl.textContent=best; localStorage.setItem('shark_best',best);} tanks.splice(0,i); while(tanks.length<4) spawnNext(); }
+                if(i > 0) { 
+                    score += i; scEl.textContent = score; 
+                    if(score>best){best=score; bsEl.textContent=best; localStorage.setItem('shark_best',best);} 
+                    tanks.splice(0,i); while(tanks.length<4) spawnNext(); 
+                }
             }
         });
-        if(shark.y > H || shark.x < cam.x-20) { gameState = 'dead'; msg.style.display = 'flex'; }
+        
+        if(shark.y > H + 100 || shark.x < cam.x - 100) { 
+            gameState = 'dead'; msg.style.display = 'flex'; 
+        }
     } else {
         shark.tail += 0.05;
-        cam.x += (cam.tx - cam.x) * 0.1;
     }
     requestAnimationFrame(draw);
 }
 
-const handleStart = (e) => { 
-    if(e.type==='touchstart') e.preventDefault();
-    if(gameState==='idle'){ holding=true; holdStart=Date.now(); if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); }
+const start = (e) => { 
+    if(e.type === 'touchstart') e.preventDefault();
+    if(gameState === 'idle'){ holding = true; holdStart = Date.now(); if(audioCtx && audioCtx.state==='suspended') audioCtx.resume(); }
 };
-const handleEnd = () => {
+const end = () => {
     if(holding) {
         holding = false; playSound('jump');
         const p = Math.min((Date.now()-holdStart)/1200, 1);
-        shark.vx = 5 + p * 10; shark.vy = -8 - p * 12;
+        shark.vx = W*0.018 + p * (W*0.028); 
+        shark.vy = -H*0.012 - p * (H*0.015);
         gameState = 'flying';
     }
 };
+cv.addEventListener('touchstart', start, {passive:false}); window.addEventListener('touchend', end);
+cv.addEventListener('mousedown', start); window.addEventListener('mouseup', end);
 
-cv.addEventListener('touchstart', handleStart); window.addEventListener('touchend', handleEnd);
-cv.addEventListener('mousedown', handleStart); window.addEventListener('mouseup', handleEnd);
-
-function restartGame() { initGame(); }
 best = localStorage.getItem('shark_best') || 0; bsEl.textContent = best;
 initGame(); draw();
 </script>
